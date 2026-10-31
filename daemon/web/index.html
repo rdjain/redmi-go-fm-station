@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111317">
+<title>FM Station</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#15171a; --mute:#6b7280; --line:#d9dce1; --accent:#2457d6; --ok:#1f8a4c; --warn:#b7791f; --bad:#c0392b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111317; --card:#1b1e24; --ink:#eceef2; --mute:#98a0ae; --line:#2c313a; --accent:#7aa2ff; --ok:#4cc38a; --warn:#e0a84a; --bad:#ff7b6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui,sans-serif; }
+  main { max-width:520px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; margin:8px 0 12px; font-weight:600; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .tabs button { flex:1; padding:10px; font-weight:600; }
+  .tabs button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .freq { font-size:56px; font-weight:700; text-align:center; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+  .freq small { font-size:20px; color:var(--mute); font-weight:500; margin-left:6px; }
+  .meta { text-align:center; color:var(--mute); font-size:14px; }
+  .row { display:flex; gap:8px; margin-top:12px; align-items:center; }
+  label { font-size:13px; color:var(--mute); display:block; margin-top:12px; }
+  input[type=text], input[type=password], input[type=number], select, textarea { width:100%; min-width:0; font:inherit; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  .row input, .row select { flex:1; }
+  button { font:inherit; padding:12px 14px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button.go { background:var(--ok); border-color:var(--ok); color:#fff; font-weight:700; width:100%; padding:16px; font-size:18px; }
+  button.stop { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:700; width:100%; padding:16px; font-size:18px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .steps button { flex:1; }
+  .presets { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .chip { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .chip button { border:0; border-radius:0; padding:8px 12px; background:transparent; }
+  .chip button.x { padding:8px 10px; color:var(--mute); }
+  .chip.on { border-color:var(--accent); }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin-top:10px; }
+  .bar i { display:block; height:100%; background:var(--ok); width:0; transition:width .3s; }
+  .msg { min-height:20px; margin-top:8px; font-size:14px; text-align:center; }
+  .msg.err { color:var(--bad); }
+  h2 { font-size:14px; margin:0 0 4px; color:var(--mute); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+  .pill { display:inline-block; padding:4px 12px; border-radius:999px; font-weight:700; font-size:14px; color:#fff; background:var(--mute); }
+  .pill.live { background:var(--ok); } .pill.retrying, .pill.starting { background:var(--warn); } .pill.error { background:var(--bad); }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0; text-align:center; }
+  .stats div { background:var(--bg); border-radius:8px; padding:8px 4px; }
+  .stats b { display:block; font-size:16px; font-variant-numeric:tabular-nums; }
+  .stats span { font-size:12px; color:var(--mute); }
+  img.preview { width:100%; border-radius:8px; border:1px solid var(--line); display:block; background:#000; aspect-ratio:16/9; object-fit:contain; }
+  pre { margin:8px 0 0; padding:10px; background:var(--bg); border-radius:8px; font-size:12px; white-space:pre-wrap; word-break:break-all; max-height:240px; overflow:auto; }
+  .chk { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:15px; color:var(--ink); }
+  .chk input { width:auto; }
+  .lib { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px; }
+  .lib img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; border:2px solid var(--line); cursor:pointer; }
+  details summary { cursor:pointer; color:var(--mute); font-size:14px; }
+  .err-line { color:var(--bad); font-size:13px; margin-top:8px; word-break:break-word; }
+</style>
+</head>
+<body>
+<main>
+  <h1>FM Station</h1>
+
+  <div class="card" id="login" hidden>
+    <h2>Access token</h2>
+    <div class="row"><input id="tok" type="password" placeholder="Paste your token" autocomplete="off"><button class="primary" id="tokBtn" style="flex:0 0 auto">Save</button></div>
+    <div id="loginMsg" class="meta"></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="tabs">
+      <button id="tabTuner" class="on">Tuner</button>
+      <button id="tabStream">Stream</button>
+    </div>
+
+    <!-- ===================== TUNER ===================== -->
+    <section id="paneTuner">
+      <div class="card">
+        <div class="freq"><span id="freq">--</span><small>MHz</small></div>
+        <div class="meta"><span id="stereo">--</span> &middot; signal <span id="sig">--</span></div>
+        <div class="bar"><i id="sigbar"></i></div>
+        <div class="meta" style="margin-top:10px;min-height:44px"><b id="rdsStation" style="color:var(--ink);font-size:18px"></b><div id="rdsRt"></div></div>
+        <form class="row" id="tuneForm">
+          <input id="freqIn" type="number" inputmode="decimal" step="0.05" min="87.5" max="107.9" placeholder="e.g. 93.5" aria-label="Frequency in MHz">
+          <button class="primary" type="submit" style="flex:0 0 auto">Tune</button>
+        </form>
+        <div class="row steps">
+          <button data-d="-1">&minus;1</button><button data-d="-0.1">&minus;0.1</button>
+          <button data-d="0.1">+0.1</button><button data-d="1">+1</button>
+        </div>
+        <div id="msg" class="msg"></div>
+      </div>
+      <div class="card">
+        <h2>Presets</h2>
+        <div class="presets" id="presets"></div>
+        <div class="row"><input id="presetName" type="text" maxlength="40" placeholder="Name (optional)"><button id="savePreset" style="flex:0 0 auto">Save current</button></div>
+      </div>
+    </section>
+
+    <!-- ===================== STREAM ===================== -->
+    <section id="paneStream" hidden>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0">YouTube Live</h2><span class="pill" id="ytState">stopped</span>
+        </div>
+        <div class="stats">
+          <div><b id="stUp">--</b><span>uptime</span></div>
+          <div><b id="stBr">--</b><span>bitrate</span></div>
+          <div><b id="stFps">--</b><span>fps</span></div>
+          <div><b id="stSpeed">--</b><span>speed</span></div>
+          <div><b id="stDrop">--</b><span>dropped</span></div>
+          <div><b id="stRe">0</b><span>restarts</span></div>
+        </div>
+        <button id="ytToggle" class="go">Go live</button>
+        <div id="ytErr" class="err-line"></div>
+        <div id="ytMsg" class="msg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Stream key</h2>
+        <div class="meta" id="keyInfo" style="text-align:left">--</div>
+        <div class="row"><input id="keyIn" type="password" placeholder="Paste key from YouTube Studio" autocomplete="off"><button id="keySave" style="flex:0 0 auto">Save key</button></div>
+        <div class="meta" style="text-align:left;margin-top:6px">Write-only: the key is never shown again.</div>
+      </div>
+
+      <div class="card">
+        <h2>Video look</h2>
+        <img id="bdPreview" class="preview" alt="Backdrop preview">
+        <label>Library (tap to use)</label>
+        <div id="lib" class="lib"></div>
+        <div class="row"><button id="bdPick">Upload your own image…</button><input id="bdFile" type="file" accept="image/jpeg,image/png" hidden></div>
+        <label for="txt">Text on the video</label>
+        <textarea id="txt" rows="2" maxlength="200" placeholder="Line 1&#10;Line 2 (smaller)"></textarea>
+        <label class="chk"><input id="showFreq" type="checkbox"> Show the current FM frequency</label>
+        <label class="chk"><input id="showPs" type="checkbox"> Show the station name (from RDS, or your preset name)</label>
+        <label class="chk"><input id="showRt" type="checkbox"> Show RDS RadioText (e.g. the song playing)</label>
+        <div class="row"><button id="lookSave" class="primary">Save look</button></div>
+        <div class="meta" style="text-align:left;margin-top:6px">Text changes apply live. A new image restarts the stream for a few seconds.</div>
+      </div>
+
+      <div class="card">
+        <h2>Quality</h2>
+        <label for="selRes">Resolution</label><select id="selRes"></select>
+        <label for="selFps">Frame rate</label><select id="selFps"></select>
+        <label for="vkbps">Video bitrate (kbps)</label><input id="vkbps" type="number" min="200" max="4000" step="50">
+        <label for="selAud">Audio bitrate (kbps, AAC)</label><select id="selAud"></select>
+        <details style="margin-top:12px"><summary>Advanced</summary>
+          <label for="rtmp">RTMP server</label><input id="rtmp" type="text" autocapitalize="off" spellcheck="false">
+        </details>
+        <div class="row"><button id="encSave" class="primary">Save quality</button></div>
+        <div class="meta" style="text-align:left;margin-top:6px">Changing quality restarts the stream for a few seconds.</div>
+      </div>
+
+      <div class="card">
+        <details><summary>Log</summary><pre id="ytLog">--</pre></details>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let token = '';
+try { token = localStorage.getItem('fmToken') || ''; } catch (e) {}
+let current = null, yt = null, tab = 'tuner', formsFilled = false, bdUrl = null;
+
+async function call(path, body, raw) {
+  const opt = { headers: { 'X-Token': token } };
+  if (raw !== undefined) { opt.method = 'POST'; opt.body = raw; }
+  else if (body !== undefined) { opt.method = 'POST'; opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  if (r.status === 401) { showLogin('Token rejected, try again.'); throw new Error('auth'); }
+  const ctype = r.headers.get('Content-Type') || '';
+  if (!r.ok) { const d = ctype.includes('json') ? await r.json().catch(() => ({})) : {}; throw new Error(d.error || ('HTTP ' + r.status)); }
+  return ctype.includes('json') ? r.json() : r.blob();
+}
+function showLogin(note) { $('app').hidden = true; $('login').hidden = false; $('loginMsg').textContent = note || ''; }
+function say(id, text, isErr) { const m = $(id); m.textContent = text || ''; m.className = 'msg' + (isErr ? ' err' : ''); }
+const fail = (id) => e => { if (e.message !== 'auth') say(id, e.message, true); };
+
+/* ---------- tabs ---------- */
+function setTab(t) {
+  tab = t;
+  $('paneTuner').hidden = t !== 'tuner'; $('paneStream').hidden = t !== 'stream';
+  $('tabTuner').className = t === 'tuner' ? 'on' : ''; $('tabStream').className = t === 'stream' ? 'on' : '';
+  if (t === 'stream') { refreshYt(true); loadBackdrop(); loadLibrary(); }
+}
+$('tabTuner').onclick = () => setTab('tuner');
+$('tabStream').onclick = () => setTab('stream');
+
+/* ---------- tuner ---------- */
+function render(s) {
+  current = s;
+  $('login').hidden = true; $('app').hidden = false;
+  $('freq').textContent = s.freq_mhz.toFixed(2).replace(/0$/, '');
+  $('stereo').textContent = s.stereo ? 'stereo' : 'mono';
+  $('sig').textContent = s.signal;
+  $('sigbar').style.width = Math.max(0, Math.min(100, s.signal / 255 * 100)) + '%';
+  $('rdsStation').textContent = s.rds ? s.rds.station : '';
+  $('rdsRt').textContent = s.rds ? s.rds.rt : '';
+  const box = $('presets'); box.textContent = '';
+  if (!s.presets.length) { const p = document.createElement('span'); p.className = 'meta'; p.textContent = 'No presets yet.'; box.appendChild(p); }
+  s.presets.forEach(p => {
+    const chip = document.createElement('span'); chip.className = 'chip' + (Math.abs(p.freq_mhz - s.freq_mhz) < 0.01 ? ' on' : '');
+    const go = document.createElement('button'); go.textContent = p.name + (p.name === String(p.freq_mhz) ? '' : ' ' + p.freq_mhz);
+    go.onclick = () => tune(p.freq_mhz);
+    const del = document.createElement('button'); del.className = 'x'; del.textContent = '×'; del.title = 'Delete preset';
+    del.onclick = () => run(() => call('/api/presets/delete', { freq_mhz: p.freq_mhz }));
+    chip.append(go, del); box.appendChild(chip);
+  });
+}
+async function run(fn) { say('msg', ''); try { render(await fn()); } catch (e) { fail('msg')(e); } }
+function tune(f) { return run(() => call('/api/tune', { freq_mhz: f })); }
+$('tuneForm').onsubmit = ev => {
+  ev.preventDefault();
+  const v = parseFloat($('freqIn').value);
+  if (isNaN(v)) { say('msg', 'Enter a frequency like 93.5', true); return; }
+  tune(v).then(() => { $('freqIn').value = ''; });
+};
+document.querySelectorAll('.steps button').forEach(b => b.onclick = () => run(() => call('/api/step', { delta_mhz: parseFloat(b.dataset.d) })));
+$('savePreset').onclick = () => run(() => call('/api/presets', { freq_mhz: current.freq_mhz, name: $('presetName').value.trim() })).then(() => { $('presetName').value = ''; });
+$('tokBtn').onclick = () => {
+  token = $('tok').value.trim(); $('tok').value = '';
+  try { localStorage.setItem('fmToken', token); } catch (e) {}
+  refresh();
+};
+async function refresh() {
+  if (!token) { showLogin(''); return; }
+  try { render(await call('/api/status')); } catch (e) { if (e.message !== 'auth') { $('app').hidden = false; say('msg', e.message, true); } }
+}
+
+/* ---------- YouTube stream ---------- */
+function fmtUp(s) { if (!s) return '--'; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + 'h ' + m + 'm' : m + 'm ' + (s % 60) + 's'; }
+function fillSelect(sel, items, val) { sel.textContent = ''; items.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); }); sel.value = val; }
+
+function renderYt(s, fillForms) {
+  yt = s;
+  const pill = $('ytState'); pill.textContent = s.state; pill.className = 'pill ' + s.state;
+  $('stUp').textContent = fmtUp(s.uptime_s);
+  $('stBr').textContent = s.bitrate && s.bitrate !== 'N/A' ? s.bitrate.replace('kbits/s', 'k') : '--';
+  $('stFps').textContent = s.fps || '--';
+  $('stSpeed').textContent = s.speed && s.speed !== 'N/A' ? s.speed : '--';
+  $('stDrop').textContent = s.dropped || '--';
+  $('stRe').textContent = s.restarts;
+  const btn = $('ytToggle'); const on = s.desired;
+  btn.textContent = on ? 'Stop stream' : 'Go live'; btn.className = on ? 'stop' : 'go';
+  $('ytErr').textContent = (s.state === 'retrying' || s.state === 'error') && s.last_error ? s.last_error : '';
+  $('keyInfo').textContent = s.key.set ? 'Key saved' + (s.key.last4 ? ' (ends in ' + s.key.last4 + ')' : '') : 'No key set yet.';
+  $('ytLog').textContent = s.log.length ? s.log.join('\n') : '(empty)';
+  if (fillForms || !formsFilled) {
+    const st = s.settings;
+    fillSelect($('selRes'), s.choices.resolutions, st.resolution);
+    fillSelect($('selFps'), s.choices.fps, st.fps);
+    fillSelect($('selAud'), s.choices.audio_kbps, st.audio_kbps);
+    $('vkbps').value = st.video_kbps; $('rtmp').value = st.rtmp_url;
+    $('txt').value = st.text; $('showFreq').checked = st.show_freq;
+    $('showPs').checked = st.show_ps; $('showRt').checked = st.show_rt;
+    formsFilled = true;
+  }
+}
+async function refreshYt(fill) {
+  try { renderYt(await call('/api/yt/status'), fill); } catch (e) { if (e.message !== 'auth') say('ytMsg', e.message, true); }
+}
+async function ytDo(path, body, okText) {
+  say('ytMsg', '');
+  try { renderYt(await call(path, body), false); if (okText) say('ytMsg', okText); } catch (e) { fail('ytMsg')(e); }
+}
+async function loadBackdrop() {
+  try {
+    const blob = await call('/api/yt/backdrop');
+    if (bdUrl) URL.revokeObjectURL(bdUrl);
+    bdUrl = URL.createObjectURL(blob); $('bdPreview').src = bdUrl;
+  } catch (e) { /* no image yet */ }
+}
+let libLoaded = false;
+async function loadLibrary() {
+  if (libLoaded) return;
+  try {
+    const d = await call('/api/yt/library'); const box = $('lib'); box.textContent = '';
+    for (const n of d.items) {
+      const im = document.createElement('img'); im.title = n; im.alt = n;
+      im.src = URL.createObjectURL(await call('/api/yt/library/' + n));
+      im.onclick = async () => {
+        say('ytMsg', '');
+        try { renderYt(await call('/api/yt/library/select', { name: n }), false); say('ytMsg', 'Backdrop changed.'); await loadBackdrop(); }
+        catch (e) { fail('ytMsg')(e); }
+      };
+      box.appendChild(im);
+    }
+    libLoaded = true;
+  } catch (e) { /* ignore */ }
+}
+$('ytToggle').onclick = () => ytDo(yt && yt.desired ? '/api/yt/stop' : '/api/yt/start', {});
+$('keySave').onclick = async () => {
+  const k = $('keyIn').value.trim(); if (!k) return;
+  await ytDo('/api/yt/key', { key: k }, 'Key saved.'); $('keyIn').value = '';
+};
+$('lookSave').onclick = () => ytDo('/api/yt/settings', { text: $('txt').value, show_freq: $('showFreq').checked,
+  show_ps: $('showPs').checked, show_rt: $('showRt').checked }, 'Saved.');
+$('encSave').onclick = () => ytDo('/api/yt/settings', {
+  resolution: $('selRes').value, fps: parseInt($('selFps').value, 10), video_kbps: parseInt($('vkbps').value, 10),
+  audio_kbps: parseInt($('selAud').value, 10), rtmp_url: $('rtmp').value.trim() }, 'Saved.');
+$('bdPick').onclick = () => $('bdFile').click();
+$('bdFile').onchange = async () => {
+  const f = $('bdFile').files[0]; if (!f) return;
+  say('ytMsg', 'Uploading…');
+  try { renderYt(await call('/api/yt/backdrop', undefined, f), false); say('ytMsg', 'Image updated.'); await loadBackdrop(); }
+  catch (e) { fail('ytMsg')(e); }
+  $('bdFile').value = '';
+};
+
+refresh();
+setInterval(() => {
+  if ($('app').hidden || document.visibilityState !== 'visible') return;
+  if (tab === 'tuner') refresh(); else refreshYt(false);
+}, 3000);
+</script>
+</body>
+</html>

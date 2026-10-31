@@ -1,0 +1,25 @@
+# secrets and per-device state: never commit
+*.env
+!*.env.example
+*.key
+yt.key
+yt.json
+!yt.json.example
+state.json
+tailscaled.state
+*.log
+*.pid
+*.bak*
+
+# python / editor
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
+
+# local captures, scratch
+*.flac
+*.pcm
+*.flv
+scratch/

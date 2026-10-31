@@ -1,0 +1,12 @@
+{
+  "rtmp_url": "rtmps://a.rtmps.youtube.com:443/live2",
+  "resolution": "854x480",
+  "fps": 5,
+  "video_kbps": 800,
+  "audio_kbps": 256,
+  "text": "Live FM radio\nHobby project",
+  "show_freq": true,
+  "show_ps": true,
+  "show_rt": true,
+  "resume": false
+}
